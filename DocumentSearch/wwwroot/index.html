@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Little Lantern — Document Search & RAG</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --accent: #f59e0b;
+            --accent-bg: #fef3c7;
+            --success-badge: #dcfce7;
+            --success-text: #166534;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 2.25rem;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        header p {
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+            font-size: 1.05rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-top: 0.25rem;
+        }
+
+        .main-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            margin-bottom: 2rem;
+        }
+
+        .preset-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .preset-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .preset-btn {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            color: #334155;
+            padding: 0.4rem 0.85rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .preset-btn:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 0.85rem 1.15rem;
+            border: 1.5px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+
+        button.submit-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.85rem 1.75rem;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        button.submit-btn:hover {
+            background: var(--primary-hover);
+        }
+
+        button.submit-btn:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .result-section {
+            display: none;
+            margin-top: 2rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .answer-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .answer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .answer-title {
+            font-weight: 700;
+            color: #1e293b;
+            font-size: 1.1rem;
+        }
+
+        .answer-text {
+            font-size: 1.05rem;
+            color: #334155;
+            white-space: pre-wrap;
+            line-height: 1.7;
+        }
+
+        .citations {
+            margin-top: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .badge {
+            display: inline-block;
+            background: var(--accent-bg);
+            color: #92400e;
+            padding: 0.25rem 0.65rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .score-badge {
+            background: var(--success-badge);
+            color: var(--success-text);
+        }
+
+        .passages-container {
+            margin-top: 1.5rem;
+        }
+
+        .passages-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 0.75rem;
+        }
+
+        .passage-card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.95rem;
+            color: #475569;
+        }
+
+        .passage-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-bottom: 0.5rem;
+        }
+
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏮 The Little Lantern</h1>
+            <p>Document Search & Question-Answering using Local RAG (Ollama + PdfPig)</p>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Document</div>
+                <div class="stat-value" id="docName">The_Little_Lantern.pdf</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Pages</div>
+                <div class="stat-value" id="docPages">2</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Indexed Chunks</div>
+                <div class="stat-value" id="docChunks">...</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Model Provider</div>
+                <div class="stat-value" id="modelProvider" style="font-size: 1rem;">Ollama (Local)</div>
+            </div>
+        </div>
+
+        <div class="main-card">
+            <div class="preset-title">Try these questions from the story:</div>
+            <div class="preset-container">
+                <button class="preset-btn" onclick="askPreset('Who is Mira and where does she live?')">Who is Mira?</button>
+                <button class="preset-btn" onclick="askPreset('Why didn\'t anyone light the lantern anymore?')">Why was the lantern dark?</button>
+                <button class="preset-btn" onclick="askPreset('What did Mira take from the storage room beneath the stairs?')">What did Mira take from storage?</button>
+                <button class="preset-btn" onclick="askPreset('How many matches did Mira strike before the lamp caught fire?')">How many matches did Mira strike?</button>
+                <button class="preset-btn" onclick="askPreset('What did the villagers do the next afternoon?')">What did the villagers do?</button>
+                <button class="preset-btn" onclick="askPreset('What was Mira\'s famous quote years later when she became the lighthouse keeper?')">Mira's quote?</button>
+            </div>
+
+            <form id="searchForm" onsubmit="handleSearch(event)">
+                <div class="input-group">
+                    <input type="text" id="queryInput" placeholder="Ask any question about 'The Little Lantern'..." required autocomplete="off">
+                    <button type="submit" class="submit-btn" id="submitBtn">
+                        <span id="btnText">Ask AI</span>
+                        <div class="spinner" id="btnSpinner"></div>
+                    </button>
+                </div>
+            </form>
+
+            <div class="result-section" id="resultSection">
+                <div class="answer-box">
+                    <div class="answer-header">
+                        <span class="answer-title">Answer:</span>
+                        <div id="citationBadges" class="citations"></div>
+                    </div>
+                    <div class="answer-text" id="answerText"></div>
+                </div>
+
+                <div class="passages-container">
+                    <div class="passages-title">Retrieved Story Passages (RAG Context):</div>
+                    <div id="passagesList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load initial document information on page load
+        async function loadDocInfo() {
+            try {
+                const res = await fetch('/api/info');
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('docName').innerText = data.documentName || 'The_Little_Lantern.pdf';
+                    document.getElementById('docPages').innerText = data.totalPages || '2';
+                    document.getElementById('docChunks').innerText = data.totalChunks || '0';
+                    document.getElementById('modelProvider').innerText = data.provider || 'Ollama (Local)';
+                }
+            } catch (err) {
+                console.error("Failed to load doc info:", err);
+            }
+        }
+
+        function askPreset(question) {
+            document.getElementById('queryInput').value = question;
+            handleSearch();
+        }
+
+        async function handleSearch(event) {
+            if (event) event.preventDefault();
+            const query = document.getElementById('queryInput').value.trim();
+            if (!query) return;
+
+            const submitBtn = document.getElementById('submitBtn');
+            const btnText = document.getElementById('btnText');
+            const btnSpinner = document.getElementById('btnSpinner');
+            const resultSection = document.getElementById('resultSection');
+
+            submitBtn.disabled = true;
+            btnText.style.display = 'none';
+            btnSpinner.style.display = 'block';
+
+            try {
+                const response = await fetch('/api/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: query })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server returned error: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                // Display answer
+                document.getElementById('answerText').innerText = data.answer || "No response received.";
+
+                // Display citations badges
+                const citationContainer = document.getElementById('citationBadges');
+                citationContainer.innerHTML = '';
+                if (data.citations && data.citations.length > 0) {
+                    data.citations.forEach(c => {
+                        const span = document.createElement('span');
+                        span.className = 'badge';
+                        span.innerText = c;
+                        citationContainer.appendChild(span);
+                    });
+                }
+
+                // Display retrieved passages
+                const passagesContainer = document.getElementById('passagesList');
+                passagesContainer.innerHTML = '';
+                if (data.retrievedChunks && data.retrievedChunks.length > 0) {
+                    data.retrievedChunks.forEach((hit, idx) => {
+                        const div = document.createElement('div');
+                        div.className = 'passage-card';
+                        const scorePercent = (hit.score * 100).toFixed(1);
+                        div.innerHTML = `
+                            <div class="passage-header">
+                                <span>#${idx + 1}: ${hit.chunk.chapter} (Page ${hit.chunk.pageNumber})</span>
+                                <span class="badge score-badge">Match: ${scorePercent}%</span>
+                            </div>
+                            <div>${hit.chunk.text}</div>
+                        `;
+                        passagesContainer.appendChild(div);
+                    });
+                }
+
+                resultSection.style.display = 'block';
+            } catch (err) {
+                alert("Error asking AI: " + err.message);
+            } finally {
+                submitBtn.disabled = false;
+                btnText.style.display = 'inline';
+                btnSpinner.style.display = 'none';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', loadDocInfo);
+    </script>
+</body>
+</html>
